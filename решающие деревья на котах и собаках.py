@@ -38,6 +38,22 @@ def gaussian_curve(I, m=9, n=9, ksize=7):
             result = np.sum(block) / (m * n)
             k.append(result)
 
+    # Параметры для шага
+    dx = height // n
+    dy = width // m
+
+    # Верхняя граница
+    k += list(I[0, ::dx])
+
+    # Нижняя граница
+    k += list(I[-1, ::dx])
+
+    # Левая граница
+    k += list(I[::dy, 0])
+
+    # Правая граница
+    k += list(I[::dy, -1])
+
     return np.array(k)
 
 def load_cats_vs_dogs_dataset(data_dir='PetImages', img_size=(128, 128), max_samples_per_class=900):

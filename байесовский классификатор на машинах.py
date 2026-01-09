@@ -9,11 +9,11 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
 
-# 67% - Гауссоваа кривизна, m=n=9, ksize=7
-# 58% - Средняя кривизна, m=n=9, ksize=9
-# 67% - Гауссова кривизна + Средняя кривизна, m=n=9, ksize=7
+# 79% - Гауссоваа кривизна, m=n=8, ksize=3
+# 75% - Средняя кривизна, m=n=9, ksize=7
+# 79% - Гауссова кривизна + Средняя кривизна, m=n=8, ksize=3
 
-def extract_gaussian_features(I, m=9, n=9, ksize=7):
+def extract_gaussian_features(I, m=8, n=8, ksize=3):
     I_x = cv2.Sobel(I, cv2.CV_64F, 1, 0, ksize=ksize)  # производные Собеля
     I_y = cv2.Sobel(I, cv2.CV_64F, 0, 1, ksize=ksize)
     I_xx = cv2.Sobel(I_x, cv2.CV_64F, 1, 0, ksize=ksize)
@@ -21,7 +21,7 @@ def extract_gaussian_features(I, m=9, n=9, ksize=7):
     I_xy = cv2.Sobel(I_x, cv2.CV_64F, 0, 1, ksize=ksize)
 
     K = ((I_xx * I_yy - I_xy ** 2) / (1 + I_x ** 2 + I_y ** 2)) ** 2  # Гауссова кривизна
-    #K = (I_xx * (1 + I_y ** 2) - 2 * I_xy * I_x * I_y + I_yy * (1 + I_x ** 2)) / pow((1 + I_x ** 2 + I_y ** 2), 1.5) # Средняя кривизна
+    # K = (I_xx * (1 + I_y ** 2) - 2 * I_xy * I_x * I_y + I_yy * (1 + I_x ** 2)) / pow((1 + I_x ** 2 + I_y ** 2), 1.5) # Средняя кривизна
 
     height, width = I.shape
     block_height = height // m  # находим дельта i,j
@@ -59,18 +59,18 @@ def extract_gaussian_features(I, m=9, n=9, ksize=7):
     return np.array(k)
 
 
-def load_cats_vs_dogs_dataset(data_dir='PetImages', img_size=(128, 128), max_samples_per_class=900):
-    # Коты: 0, Собаки: 1
+def load_cars_vs_not_cars_dataset(data_dir='cars', img_size=(128, 128), max_samples_per_class=900):
+    # Машины: 0, Не машины: 1
 
     images = []
     labels = []
 
-    cat_dir = os.path.join(data_dir, 'Cat')
-    cat_files = os.listdir(cat_dir)
-    cat_files = cat_files[:max_samples_per_class]
-    for i, filename in enumerate(cat_files):
+    car_dir = os.path.join(data_dir, 'cars-1776')
+    car_files = os.listdir(car_dir)
+    car_files = car_files[:max_samples_per_class]
+    for i, filename in enumerate(car_files):
         try:
-            img_path = os.path.join(cat_dir, filename)
+            img_path = os.path.join(car_dir, filename)
             img = load_img(img_path, target_size=img_size, color_mode='grayscale')
             img_array = img_to_array(img).astype('float32') / 255.0
             img_array = img_array.reshape(img_size)
@@ -79,12 +79,12 @@ def load_cats_vs_dogs_dataset(data_dir='PetImages', img_size=(128, 128), max_sam
         except Exception as e:
             print(f"Ошибка загрузки {filename}: {e}")
 
-    dog_dir = os.path.join(data_dir, 'Dog')
-    dog_files = os.listdir(dog_dir)
-    dog_files = dog_files[:max_samples_per_class]
-    for i, filename in enumerate(dog_files):
+    not_car_dir = os.path.join(data_dir, 'notcars-1800')
+    not_car_files = os.listdir(not_car_dir)
+    not_car_files = not_car_files[:max_samples_per_class]
+    for i, filename in enumerate(not_car_files):
         try:
-            img_path = os.path.join(dog_dir, filename)
+            img_path = os.path.join(not_car_dir, filename)
             img = load_img(img_path, target_size=img_size, color_mode='grayscale')
             img_array = img_to_array(img).astype('float32') / 255.0
             img_array = img_array.reshape(img_size)
@@ -107,7 +107,7 @@ def load_cats_vs_dogs_dataset(data_dir='PetImages', img_size=(128, 128), max_sam
     return (x_train, y_train), (x_test, y_test)
 
 
-(x_train, y_train), (x_test, y_test) = load_cats_vs_dogs_dataset()
+(x_train, y_train), (x_test, y_test) = load_cars_vs_not_cars_dataset()
 
 X_train_features = []
 for img in x_train:

@@ -1,19 +1,17 @@
 import os
 from time import time
 import numpy as np
-from keras.utils import load_img, img_to_array
+from keras.src.utils import load_img, img_to_array
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import PowerTransformer
 import cv2
-from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
-import matplotlib.pyplot as plt
 
-# 67% - Гауссоваа кривизна, m=n=9, ksize=7
-# 58% - Средняя кривизна, m=n=9, ksize=9
-# 67% - Гауссова кривизна + Средняя кривизна, m=n=9, ksize=7
+# 88% - Гауссова кривизна, m=n=9, ksize=3
+# 90% - Средняя кривизна, m=n=9, ksize=3
+# 88% - Гауссова кривизна + Средняя кривизна, m=n=9, ksize=3
 
-def extract_gaussian_features(I, m=9, n=9, ksize=7):
+def gaussian_curve(I, m=9, n=9, ksize=3):
     I_x = cv2.Sobel(I, cv2.CV_64F, 1, 0, ksize=ksize)  # производные Собеля
     I_y = cv2.Sobel(I, cv2.CV_64F, 0, 1, ksize=ksize)
     I_xx = cv2.Sobel(I_x, cv2.CV_64F, 1, 0, ksize=ksize)
@@ -21,7 +19,7 @@ def extract_gaussian_features(I, m=9, n=9, ksize=7):
     I_xy = cv2.Sobel(I_x, cv2.CV_64F, 0, 1, ksize=ksize)
 
     K = ((I_xx * I_yy - I_xy ** 2) / (1 + I_x ** 2 + I_y ** 2)) ** 2  # Гауссова кривизна
-    #K = (I_xx * (1 + I_y ** 2) - 2 * I_xy * I_x * I_y + I_yy * (1 + I_x ** 2)) / pow((1 + I_x ** 2 + I_y ** 2), 1.5) # Средняя кривизна
+    # K = (I_xx * (1 + I_y ** 2) - 2 * I_xy * I_x * I_y + I_yy * (1 + I_x ** 2)) / pow((1 + I_x ** 2 + I_y ** 2), 1.5) # Средняя кривизна
 
     height, width = I.shape
     block_height = height // m  # находим дельта i,j
@@ -58,19 +56,20 @@ def extract_gaussian_features(I, m=9, n=9, ksize=7):
 
     return np.array(k)
 
-
-def load_cats_vs_dogs_dataset(data_dir='PetImages', img_size=(128, 128), max_samples_per_class=900):
-    # Коты: 0, Собаки: 1
+def load_cars_vs_not_cars_dataset(data_dir='cars', img_size=(128, 128), max_samples_per_class=900):
+    # Машины: 0, Не машины: 1
 
     images = []
     labels = []
 
-    cat_dir = os.path.join(data_dir, 'Cat')
-    cat_files = os.listdir(cat_dir)
-    cat_files = cat_files[:max_samples_per_class]
-    for i, filename in enumerate(cat_files):
+    car_dir = os.path.join(data_dir, 'cars-1776')
+    not_car_dir = os.path.join(data_dir, 'notcars-1800')
+
+    car_files = os.listdir(car_dir)
+    car_files = car_files[:max_samples_per_class]
+    for i, filename in enumerate(car_files):
         try:
-            img_path = os.path.join(cat_dir, filename)
+            img_path = os.path.join(car_dir, filename)
             img = load_img(img_path, target_size=img_size, color_mode='grayscale')
             img_array = img_to_array(img).astype('float32') / 255.0
             img_array = img_array.reshape(img_size)
@@ -79,12 +78,12 @@ def load_cats_vs_dogs_dataset(data_dir='PetImages', img_size=(128, 128), max_sam
         except Exception as e:
             print(f"Ошибка загрузки {filename}: {e}")
 
-    dog_dir = os.path.join(data_dir, 'Dog')
-    dog_files = os.listdir(dog_dir)
-    dog_files = dog_files[:max_samples_per_class]
-    for i, filename in enumerate(dog_files):
+
+    not_car_files = os.listdir(not_car_dir)
+    not_car_files = not_car_files[:max_samples_per_class]
+    for i, filename in enumerate(not_car_files):
         try:
-            img_path = os.path.join(dog_dir, filename)
+            img_path = os.path.join(not_car_dir, filename)
             img = load_img(img_path, target_size=img_size, color_mode='grayscale')
             img_array = img_to_array(img).astype('float32') / 255.0
             img_array = img_array.reshape(img_size)
@@ -106,45 +105,36 @@ def load_cats_vs_dogs_dataset(data_dir='PetImages', img_size=(128, 128), max_sam
 
     return (x_train, y_train), (x_test, y_test)
 
+(x_train, y_train), (x_test, y_test) = load_cars_vs_not_cars_dataset()
 
-(x_train, y_train), (x_test, y_test) = load_cats_vs_dogs_dataset()
-
+# Тренировочные данные
 X_train_features = []
-for img in x_train:
-    X_train_features.append(extract_gaussian_features(img))
+for i, image in enumerate(x_train):
+    features = gaussian_curve(image)
+    X_train_features.append(features)
 X_train_features = np.array(X_train_features)
 
+# Тестовые данные
 X_test_features = []
-for img in x_test:
-    X_test_features.append(extract_gaussian_features(img))
+for i, image in enumerate(x_test):
+    features = gaussian_curve(image)
+    X_test_features.append(features)
+
 X_test_features = np.array(X_test_features)
 
-gnb = GaussianNB()
+svm = SVC()
 
-transformer = PowerTransformer(method='yeo-johnson')  # Делаем признаки более гауссовыми
-X_train_features = transformer.fit_transform(X_train_features)
-X_test_features = transformer.transform(X_test_features)
+# Обучение
+start_fit = time()
+svm.fit(X_train_features, y_train)
+fit_time = time() - start_fit
+print(f"Время обучения: {fit_time:.2f}с")
 
-t_begin = time()
-gnb.fit(X_train_features, y_train)
-print(f"\nВремя обучения: {time() - t_begin}")
-
-t_begin = time()
-y_pred = gnb.predict(X_test_features)
-print(f"\nВремя предсказания: {time() - t_begin}")
+# Предсказание
+start_predict = time()
+y_pred = svm.predict(X_test_features)
+predict_time = time() - start_predict
+print(f"Время предсказания: {predict_time:.2f}с")
 
 accuracy = accuracy_score(y_test, y_pred)
-print(f"\nТочность на тестовых данных: {accuracy:.4f}")
-
-# Визуализация нескольких примеров
-# fig, axes = plt.subplots(2, 5, figsize=(15, 6))
-# for i in range(min(10, len(x_test))):
-#     ax = axes[i // 5, i % 5]
-#     ax.imshow(x_test[i], cmap='gray')
-#     true_label = 'Cat' if y_test[i] == 0 else 'Dog'
-#     pred_label = 'Cat' if y_pred[i] == 0 else 'Dog'
-#     color = 'green' if y_test[i] == y_pred[i] else 'red'
-#     ax.set_title(f'True: {true_label}\nPred: {pred_label}', color=color)
-#     ax.axis('off')
-# plt.tight_layout()
-# plt.show()
+print(f"Точность: {accuracy:.4f}")
